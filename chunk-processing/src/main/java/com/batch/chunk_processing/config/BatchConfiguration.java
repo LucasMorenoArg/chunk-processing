@@ -37,7 +37,7 @@ public class BatchConfiguration {
 	@Autowired
 	public DataSource dataSource;
 
-	public ItemReader<String> itemReader(){
+	public ItemReader<String> itemRead(){
 		List<String> productList = new ArrayList<>();
 		productList.add("Product 1");
 		productList.add("Product 2");
@@ -66,7 +66,7 @@ public class BatchConfiguration {
 	}
 
 	@Bean
-	public ItemReader<Product> jdbcItemReader(){
+	public ItemReader<Product> jdbcCursorItemReader(){
 		JdbcCursorItemReader<Product> itemReader = new JdbcCursorItemReader<>();
 		itemReader.setDataSource(dataSource);
 		itemReader.setSql("select * from product_details order by product_id");
@@ -79,7 +79,7 @@ public class BatchConfiguration {
 		return stepBuilderFactory.get("chunkBasedStep1")
 				.<Product,Product>chunk(3)
 				//.reader(flatFileItemReader())
-				.reader(jdbcItemReader())
+				.reader(jdbcCursorItemReader())
 				.writer(new ItemWriter<Product>() {
 					@Override
 					public void write(List<? extends Product> list) throws Exception {
