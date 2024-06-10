@@ -12,6 +12,8 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
+import org.springframework.batch.item.database.JdbcPagingItemReader;
+import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
@@ -65,6 +67,7 @@ public class BatchConfiguration {
 		return itemReader;
 	}
 
+
 	@Bean
 	public ItemReader<Product> jdbcCursorItemReader(){
 		JdbcCursorItemReader<Product> itemReader = new JdbcCursorItemReader<>();
@@ -73,13 +76,26 @@ public class BatchConfiguration {
 		itemReader.setRowMapper(new ProductRowMapper());
 		return itemReader;
 	}
-	
 	@Bean
-	public Step step1() {
+	public ItemReader<Product> jdbcPagingItemReader() throws Exception {
+		JdbcPagingItemReader<Product> itemReader = new JdbcPagingItemReader<>();
+		itemReader.setDataSource(dataSource);
+		SqlPagingQueryProviderFactoryBean factoryBean = new SqlPagingQueryProviderFactoryBean();
+		factoryBean.setDataSource(dataSource);
+		factoryBean.setSelectClause("select product_id, product_name, product_category, product_price");
+		factoryBean.setFromClause("from product_details");
+		factoryBean.setSortKey("product_id");
+		itemReader.setQueryProvider(factoryBean.getObject());
+		itemReader.setRowMapper(new ProductRowMapper());
+		itemReader.setPageSize(3);
+		return itemReader;
+	}
+	@Bean
+	public Step step1() throws Exception {
 		return stepBuilderFactory.get("chunkBasedStep1")
 				.<Product,Product>chunk(3)
 				//.reader(flatFileItemReader())
-				.reader(jdbcCursorItemReader())
+				.reader(jdbcPagingItemReader())
 				.writer(new ItemWriter<Product>() {
 					@Override
 					public void write(List<? extends Product> list) throws Exception {
@@ -92,7 +108,7 @@ public class BatchConfiguration {
 	}
 	
 	@Bean
-	public Job firstJob() {
+	public Job firstJob() throws Exception {
 		return this.jobBuilderFactory.get("job1")
 				.start(step1())
 				.build();
