@@ -1,16 +1,21 @@
 package com.batch.chunk_processing.config;
 
+import com.batch.chunk_processing.domain.OSProduct;
 import com.batch.chunk_processing.domain.Product;
 import com.batch.chunk_processing.domain.ProductRowMapper;
 import com.batch.chunk_processing.domain.ProductSetFieldMapper;
+import com.batch.chunk_processing.processor.MyProductItemProcessor;
 import com.batch.chunk_processing.reader.ProductNameItemReader;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
@@ -67,7 +72,6 @@ public class BatchConfiguration {
 		lineMapper.setLineTokenizer(lineTokenizer);
 		lineMapper.setFieldSetMapper(new ProductSetFieldMapper());
 		itemReader.setLineMapper(lineMapper);
-
 		return itemReader;
 	}
 
@@ -97,7 +101,7 @@ public class BatchConfiguration {
     @Bean
 	public ItemWriter<Product> flatFileItemWriter(){
 		FlatFileItemWriter<Product> itemWriter = new FlatFileItemWriter<>();
-		itemWriter.setResource(new FileSystemResource("output/Product_Details_Output.csv"));
+		itemWriter.setResource(new FileSystemResource("resources/data/Product_Details_Output.csv"));
 		DelimitedLineAggregator<Product> lineAggregator = new DelimitedLineAggregator<>();
 		lineAggregator.setDelimiter(",");
 		BeanWrapperFieldExtractor<Product> fieldExtractor = new BeanWrapperFieldExtractor<>();
@@ -106,13 +110,44 @@ public class BatchConfiguration {
 		itemWriter.setLineAggregator(lineAggregator);
 		return itemWriter;
 	}
+//	@Bean
+//	public JdbcBatchItemWriter<Product> jdbcBatchItemWriter(){
+//		JdbcBatchItemWriter<Product> itemWriter = new JdbcBatchItemWriter<>();
+//		itemWriter.setDataSource(dataSource);
+//		itemWriter.setSql
+//		("insert into product_details_output values (:productId,:productName,:productCategory,:productPrice)");
+//		itemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>());
+//		return itemWriter;
+//	}
+
+	@Bean
+	public JdbcBatchItemWriter<OSProduct> jdbcBatchItemWriter(){
+		JdbcBatchItemWriter<OSProduct> itemWriter = new JdbcBatchItemWriter<>();
+		itemWriter.setDataSource(dataSource);
+		itemWriter.setSql
+				("insert into os_product_details values (:productId," +
+						":productName," +
+						":productCategory," +
+						":productPrice," +
+						":taxPercent," +
+						":sku," +
+						":shippingRate)");
+		itemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>());
+		return itemWriter;
+	}
+
+	@Bean
+	public ItemProcessor<Product, OSProduct> myProductItemProcessor(){
+		return new MyProductItemProcessor();
+	}
 	@Bean
 	public Step step1() throws Exception {
 		return stepBuilderFactory.get("chunkBasedStep1")
-				.<Product,Product>chunk(3)
+				.<Product,OSProduct>chunk(3)
 				//.reader(flatFileItemReader())
 				.reader(jdbcPagingItemReader())
-				.writer(flatFileItemWriter())
+				.processor(myProductItemProcessor())
+				.writer(jdbcBatchItemWriter())
 				.build();
 	}
 	
